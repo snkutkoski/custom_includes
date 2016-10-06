@@ -94,11 +94,11 @@ describe CustomIncludes do
   it 're-runs custom includes on queries applied to loaded AR relations' do
     TestRecord.create!(name: 'name2', special_id: 2)
 
-    records = TestRecord.where(id: 2).custom_includes(:special)
+    records = TestRecord.where(id: [1, 2]).custom_includes(:special)
     records.load
-    records = records.or(TestRecord.where(id: 1))
+    records = records.where(id: 1)
 
-    expect(records.map { |r| r.special }).to contain_exactly(Special.new(1), Special.new(2))
+    expect(records.map { |r| r.special }).to contain_exactly(Special.new(1))
   end
 
   it 'raises a CustomIncludesError when a matching included object cannot be found for the record' do

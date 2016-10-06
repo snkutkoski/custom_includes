@@ -14,7 +14,7 @@ module CustomIncludes
       relation_class = "#{self}::ActiveRecord_Relation".constantize
       relation_class.include(CustomIncludesRelation) unless relation_class.included_modules.include?(CustomIncludesRelation)
 
-      unless self.has_attribute?(record_attr)
+      unless self.method_defined?(record_attr) || self.column_names.include?(record_attr.to_s)
         raise CustomIncludes::Error.new("#{self} must have a #{record_attr} attribute")
       end
 
