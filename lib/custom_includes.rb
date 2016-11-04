@@ -10,7 +10,6 @@ module CustomIncludes
 
   class_methods do
     def custom_belongs_to(obj, record_attr, obj_id, **options)
-
       relation_class = "#{self}::ActiveRecord_Relation".constantize
       relation_class.include(CustomIncludesRelation) unless relation_class.included_modules.include?(CustomIncludesRelation)
 
@@ -19,14 +18,21 @@ module CustomIncludes
       end
 
       @custom_belongs_to ||= {}
-      @custom_belongs_to[obj] = { record_attr: record_attr, obj_id: obj_id, options: options }
+      @custom_belongs_to[obj] = { record_attr: record_attr, obj_id: obj_id, options: {raise_on_not_found: true}.merge(options) }
+
+      define_method("#{obj}=") do |val|
+        send("#{record_attr}=", val.send(obj_id))
+      end
 
       define_method("#{obj}_included=") do |val|
         instance_variable_set("@#{obj}_included", val)
       end
 
       define_method(obj) do
-        instance_variable_get("@#{obj}_included") || send("find_#{obj}")
+        attr_val = send(record_attr)
+        return nil unless attr_val
+        included = instance_variable_get("@#{obj}_included")
+        included && included.send(obj_id) != attr_val ? included : send("find_#{obj}")
       end
     end
 
@@ -80,7 +86,7 @@ module CustomIncludes
         end
 
         belongs_to_data = model_class.custom_belongs_to_data[value]
-        db_ids = Set.new(@records.map { |r| r.send(belongs_to_data[:record_attr]) }).to_a
+        db_ids = Set.new(@records.map { |r| r.send(belongs_to_data[:record_attr]) }.compact).to_a
         objs = model_class.send(custom_includes_method, db_ids)
 
         objs_by_id = objs.reduce({}) do |objs_hash, obj|
@@ -94,9 +100,10 @@ module CustomIncludes
 
         @records.each do |r|
           record_attr = r.send(belongs_to_data[:record_attr])
+          next unless record_attr
           included_obj = objs_by_id[record_attr]
 
-          unless included_obj
+          if belongs_to_data[:options][:raise_on_not_found] && !included_obj
             raise CustomIncludes::Error.new("Could not find an object to include with a #{belongs_to_data[:record_attr]} of #{record_attr}")
           end
           r.send("#{value}_included=", included_obj)
@@ -109,7 +116,7 @@ module CustomIncludes
 
     define_method(:load) do
       ar_load.bind(self).call
-      perform_custom_includes if custom_includes_values.present? && !custom_includes_loaded?
+      perform_custom_includes if @records.present? && custom_includes_values.present? && !custom_includes_loaded?
       self
     end
 
