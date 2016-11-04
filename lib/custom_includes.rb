@@ -32,7 +32,7 @@ module CustomIncludes
         attr_val = send(record_attr)
         return nil unless attr_val
         included = instance_variable_get("@#{obj}_included")
-        included && included.send(obj_id) != attr_val ? included : send("find_#{obj}")
+        included && included.send(obj_id) == attr_val ? included : send("find_#{obj}")
       end
     end
 
