@@ -18,7 +18,7 @@ module CustomIncludes
       end
 
       @custom_belongs_to ||= {}
-      @custom_belongs_to[obj] = { record_attr: record_attr, obj_id: obj_id, options: {raise_on_not_found: true}.merge(options) }
+      @custom_belongs_to[obj] = { record_attr: record_attr, obj_id: obj_id, options: {raise_on_not_found: false}.merge(options) }
 
       define_method("#{obj}=") do |val|
         send("#{record_attr}=", val.send(obj_id))

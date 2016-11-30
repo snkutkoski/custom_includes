@@ -103,7 +103,7 @@ describe CustomIncludes do
 
   it 'raises a CustomIncludesError when a matching included object cannot be found for the record' do
     class TestRecordRequireMatches < BaseTestRecord
-      custom_belongs_to :special, :special_id, :id
+      custom_belongs_to :special, :special_id, :id, raise_on_not_found: true
 
       def self.special_custom_includes(ids)
         [Special.new(1001), Special.new(1002)]

@@ -1,36 +1,98 @@
 # CustomIncludes
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/custom_includes`. To experiment with that code, run `bin/console` for an interactive prompt.
-
-TODO: Delete this and the text above, and describe your gem
+CustomIncludes provides functionality similar to [includes](http://api.rubyonrails.org/classes/ActiveRecord/QueryMethods.html#method-i-includes) for ActiveRecord objects that are associated to potentially non-ActiveRecord objects. It accomplishes this by matching up a column on the database table with a field in the associated object. Using CustomIncludes requires defining two "finder" methods per custom association that retrieve associated objects, as documented in the Usage sections of this README.
 
 ## Installation
 
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'custom_includes'
+gem 'custom_includes', git: 'git@bitbucket.org:Steven_Kutkoski/custom_include.git', branch: :master
 ```
 
 And then execute:
 
-    $ bundle
+    $ bundle install
 
-Or install it yourself as:
 
-    $ gem install custom_includes
+## Basic Usage
 
-## Usage
+CustomIncludes may be useful in a variety of situations, such as when the associated object does not exist in your application's database but is retrievable through HTTP requests. For example, the following would produce multiple HTTP requests.
 
-TODO: Write usage instructions here
+```ruby
+class Positions < ActiveRecord::Base
+  def facility
+    find_facility_via_http(facility_id)
+  end
+end
 
-## Development
+positions = Positions.where('created_at > ?', Time.now - 1.day)
+positions.each do |p|
+  puts p.facility  
+end
+```
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+But this would only create one request.
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+```ruby
+class Positions < ActiveRecord::Base
+  custom_belongs_to :facility, :facility_id, :id
 
-## Contributing
+  def find_facility
+    find_facility_via_http(facility_id)
+  end
+  
+  def facility_custom_includes(facility_ids)
+    find_all_facilities_via_http(facility_ids)
+  end
+end
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/custom_includes.
+positions = Positions.custom_includes(:facility).where('created_at > ?', Time.now - 1.day)
+positions.each do |p|
+  puts p.facility  
+end
+```
 
+Obviously, this would require the "find_all_facilities_via_http" method to only perform one request. The advantage of CustomIncludes is the ability to chain it with normal ActiveRecord query methods and assign the facilities to the correct position in the resulting ActiveRecord::Relation.
+
+## Detailed Usage Description
+1. Include the module.
+```ruby
+    include CustomIncludes
+```
+
+2. Configure the association. CustomIncludes needs to know what to call this association, what column to use, and what attribute to compare it to in the associated object.
+```ruby
+    belongs_to :associated, :column_name, :associated_id
+```
+
+3. Provide a finder method for an individual record. This method must be named "find_associated" and not just "associated." This is because CustomIncludes generates the "associated" method so that when it is called it checks for an included association before performing the find.
+```
+    def find_associated
+      # Implement a method that returns the associated object here. Its associated_id should match the column_name
+    end
+```
+
+4. Provide a finder method for including associations named "associated_custom_includes". This method should return all the associated objects that match given ids. This method is called when a query is executed that contains a "custom_includes" as part of its query chain.
+```ruby
+    def associated_custom_includes(associated_ids)
+      # Implement a method that returns the associated objects with the given associated_ids as an Array.
+    end
+```
+
+5. Use the custom_includes method. When this is added to an ActiveRecord query chain, it tells CustomIncludes to perform the "associated_custom_includes" method once the rest of the query is completed. It passes all the values in the results' "column_name" values to this method. Then, it assigns the resulting associated objects to the correct ActiveRecord object by comparing it to the "column_name" values. Any future calls to "associated" will return this included object rather than performing find_associated.
+```ruby
+    # Runs associated_custom_includes
+    models = MyModel.where(something).includes(something).custom_includes(:associated).where(something_else)
+    
+    # Returns the already included association
+    models[0].associated
+```
+
+### Options
+* raise_on_not_found
+    * Defaults to false
+    * If true, raises an Error when the query returns a model that does not have a matching association returned from associated_custom_includes.
+    * If false, sets the associated object to nil when the query returns a model that does not have a matching association returned from associated_custom_includes.
+
+    
