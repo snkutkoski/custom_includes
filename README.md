@@ -66,7 +66,7 @@ Obviously, this would require the "find_all_facilities_via_http" method to only 
     belongs_to :associated, :column_name, :associated_id
 ```
 * Provide a finder method for an individual record. This method must be named "find_associated" and not just "associated." This is because CustomIncludes generates the "associated" method so that when it is called it checks for an included association before performing the find.
-```
+```ruby
     def find_associated
       # Implement a method that returns the associated object here. Its associated_id should match the column_name
     end
