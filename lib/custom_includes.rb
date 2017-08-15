@@ -10,6 +10,8 @@ module CustomIncludes
 
   class_methods do
     def custom_belongs_to(obj, record_attr, obj_id, **options)
+      return false unless table_exists?
+
       relation_class = "#{self}::ActiveRecord_Relation".constantize
       relation_class.include(CustomIncludesRelation) unless relation_class.included_modules.include?(CustomIncludesRelation)
 
